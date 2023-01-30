@@ -115,10 +115,14 @@ def submit(request, course_id):
     course = get_object_or_404(Course, pk=course_id)
     enrollment = Enrollment.objects.get(user=user, course=course)
     submission = Submission.objects.create(enrollment=enrollment)
-    choice=extract_answers(request)
-    submission.choices.set(choice)
-    show_exam_result(request, course.id, submission.id)    
-    
+    answers=extract_answers(request)
+    submission.choices.set(answers)
+    submission.save()
+    return HttpResponseRedirect(reverse(
+        viewname='onlinecourse:show_exam_result',
+        args=(course.id, submission.id,)
+    ))
+
 # <HINT> A example method to collect the selected choices from the exam form from the request object
 def extract_answers(request):
     submitted_anwsers = []
@@ -140,19 +144,16 @@ def show_exam_result(request, course_id, submission_id):
     context = {}
     course = get_object_or_404(Course, pk=course_id)
     submission = get_object_or_404(Submission, pk=submission_id)
-    #choices = submission.choices
-    #print(submission.choices)
-    #for choice in choices:
-    #    obj_choice = get_object_or_404(Choice, pk=choice)
-    #    if obj_choice.is_correct:
-    #        c_count += obj_choice.question_set.grade 
-    #        t_count += obj_choice.question_set.grade           
-    #    else:
-    #        t_count += obj_choice.question_set.grade
-    #grade = (c_count/t_count) * 100
+    choices = submission.choices.all()
+    total, correct = 0, 0
+    for question in course.question_set.all():
+        total += question.grade
+        if question.is_get_score(choices):
+            correct += question.grade
+    
 
     context['course'] = course
-    #context['selected_ids'] = choices
-    #context['grade'] = grade
+    context['selected_ids'] = choices
+    context['grade'] = int((correct/total) * 100)
 
     return render(request, 'onlinecourse/exam_result_bootstrap.html', context)
